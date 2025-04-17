@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'profile.dart';
 import 'map_screen.dart';
+import 'notifications_page.dart';
+import 'profile.dart';
 
 class HomePage extends StatefulWidget {
   @override
@@ -8,13 +9,13 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  int _currentIndex = 2; // Start on Map Page
+  int _currentIndex = 0; // Start with Map as home
 
   final List<Widget> _pages = [
-    Placeholder(),         // Home
-    Placeholder(),         // Camera
-    MapScreen(),           // Map
-    StylishProfilePage(),  // Profile
+    MapScreen(),               // Map tab
+    Placeholder(),             // Camera tab
+    NotificationsPage(),       // Notifications tab
+    StylishProfilePage(),      // Profile tab
   ];
 
   @override
@@ -35,10 +36,22 @@ class _HomePageState extends State<HomePage> {
         showUnselectedLabels: false,
         type: BottomNavigationBarType.fixed,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.camera_alt), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.map), label: ''),  // Map icon
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: ''),  // Profile
+          BottomNavigationBarItem(
+            icon: Icon(Icons.map),
+            label: 'Map',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.camera_alt),
+            label: 'Camera',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.notifications),
+            label: 'Notifications',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
+          ),
         ],
       ),
     );

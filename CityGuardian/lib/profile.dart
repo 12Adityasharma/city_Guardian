@@ -11,8 +11,8 @@ class StylishProfilePage extends StatefulWidget {
 
 class _StylishProfilePageState extends State<StylishProfilePage> {
   String _name = 'Deepak Singh';
-  String _email = 'emaildhafsbjabsj@kmail.com';
-  int _rewards = 425; // Example reward count
+  String _email = 'deepaksingh91065@gmail.com';
+  int _rewards = 469; // Example reward count
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +41,7 @@ class _StylishProfilePageState extends State<StylishProfilePage> {
                       children: [
                         CircleAvatar(
                           radius: 42,
-                          backgroundImage: const AssetImage('assets/deepak.jpg'),
+                          backgroundImage: const AssetImage('assets/deepak.jpeg'),
                         ),
                         const SizedBox(height: 10),
                         Text(
