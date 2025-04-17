@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'map_screen.dart';
 import 'notifications_page.dart';
 import 'profile.dart';
+import 'camera_page.dart';
 
 class HomePage extends StatefulWidget {
   @override
@@ -13,7 +14,7 @@ class _HomePageState extends State<HomePage> {
 
   final List<Widget> _pages = [
     MapScreen(),               // Map tab
-    Placeholder(),             // Camera tab
+    CameraPage(),               // Camera tab
     NotificationsPage(),       // Notifications tab
     StylishProfilePage(),      // Profile tab
   ];
