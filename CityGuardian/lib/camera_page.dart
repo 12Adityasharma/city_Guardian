@@ -80,9 +80,9 @@ class _CameraPageState extends State<CameraPage> {
               _cameraController!.value.isInitialized) {
             return Stack(
               children: [
-                CameraPreview(_cameraController!),
-
-                // Capture button
+                SizedBox.expand(
+                  child: CameraPreview(_cameraController!),
+                ),
                 Positioned(
                   bottom: 30,
                   left: 0,
@@ -94,8 +94,6 @@ class _CameraPageState extends State<CameraPage> {
                     ),
                   ),
                 ),
-
-                // Thumbnail of captured image
                 if (_capturedImage != null)
                   Positioned(
                     top: 40,
