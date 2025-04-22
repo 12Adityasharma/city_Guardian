@@ -1,7 +1,9 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
+import 'package:http/http.dart' as http;
 import 'package:permission_handler/permission_handler.dart';
 
 class MapScreen extends StatefulWidget {
@@ -10,9 +12,8 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  GoogleMapController? _mapController;
-  LatLng _currentPosition = const LatLng(27.552990, 76.634573); // Default location
-  Stream<Position>? _positionStream;
+  final MapController _mapController = MapController();
+  LatLng _currentPosition = LatLng(27.552990, 76.634573); // default location
   TextEditingController _searchController = TextEditingController();
 
   @override
@@ -26,58 +27,51 @@ class _MapScreenState extends State<MapScreen> {
     if (!permission.isGranted) {
       await Permission.locationWhenInUse.request();
     }
-    _initLocationTracking();
+    _getCurrentLocation();
   }
 
-  void _initLocationTracking() async {
-    bool isEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!isEnabled) {
+  Future<void> _getCurrentLocation() async {
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
       await Geolocator.openLocationSettings();
       return;
     }
 
-    _positionStream = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 10,
-      ),
+    Position position = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
     );
-
-    _positionStream!.listen((Position position) {
-      setState(() {
-        _currentPosition = LatLng(position.latitude, position.longitude);
-      });
-
-      _mapController?.animateCamera(
-        CameraUpdate.newCameraPosition(
-          CameraPosition(
-            target: _currentPosition,
-            zoom: 17.0,
-          ),
-        ),
-      );
+    setState(() {
+      _currentPosition = LatLng(position.latitude, position.longitude);
     });
+
+    _mapController.move(_currentPosition, 15);
   }
 
   Future<void> _searchLocation(String query) async {
-    try {
-      List<Location> locations = await locationFromAddress(query);
-      if (locations.isNotEmpty) {
-        Location loc = locations.first;
-        LatLng searchedLatLng = LatLng(loc.latitude, loc.longitude);
+    final url = Uri.parse(
+      'https://nominatim.openstreetmap.org/search?q=$query&format=json&limit=1',
+    );
 
-        _mapController?.animateCamera(
-          CameraUpdate.newCameraPosition(
-            CameraPosition(
-              target: searchedLatLng,
-              zoom: 17.0,
-            ),
-          ),
+    try {
+      final response = await http.get(url, headers: {
+        'User-Agent': 'FlutterMapApp/1.0 (your_email@example.com)' // required by Nominatim
+      });
+
+      final data = jsonDecode(response.body);
+      if (data.isNotEmpty) {
+        final lat = double.parse(data[0]['lat']);
+        final lon = double.parse(data[0]['lon']);
+        LatLng searchedLatLng = LatLng(lat, lon);
+
+        _mapController.move(searchedLatLng, 15);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Location not found')),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Location not found')),
+        SnackBar(content: Text('Search error')),
       );
     }
   }
@@ -87,17 +81,33 @@ class _MapScreenState extends State<MapScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: _currentPosition,
-              zoom: 14.0,
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: _currentPosition,
+              initialZoom: 14,
+              interactionOptions: const InteractionOptions(
+                enableScrollWheel: true,
+                enableMultiFingerGestureRace: true,
+              ),
             ),
-            onMapCreated: (GoogleMapController controller) {
-              _mapController = controller;
-            },
-            myLocationEnabled: true,
-            myLocationButtonEnabled: false, // hide default button
-            mapType: MapType.normal,
+            children: [
+              TileLayer(
+                urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                subdomains: const ['a', 'b', 'c'],
+                userAgentPackageName: 'com.example.app',
+              ),
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: _currentPosition,
+                    width: 40,
+                    height: 40,
+                    child: const Icon(Icons.location_pin, color: Colors.red, size: 40),
+                  )
+                ],
+              ),
+            ],
           ),
 
           // Search box
@@ -125,22 +135,12 @@ class _MapScreenState extends State<MapScreen> {
             ),
           ),
 
-          // Custom square location button matching zoom button style
+          // Location button
           Positioned(
             bottom: 100,
             right: 10,
             child: GestureDetector(
-              onTap: () async {
-                Position position = await Geolocator.getCurrentPosition(
-                  desiredAccuracy: LocationAccuracy.high,
-                );
-                LatLng newPos = LatLng(position.latitude, position.longitude);
-                _mapController?.animateCamera(
-                  CameraUpdate.newCameraPosition(
-                    CameraPosition(target: newPos, zoom: 17),
-                  ),
-                );
-              },
+              onTap: _getCurrentLocation,
               child: Container(
                 width: 40,
                 height: 40,
