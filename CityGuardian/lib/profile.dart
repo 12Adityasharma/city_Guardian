@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'edit_profile.dart'; // Import EditProfilePage
-import 'main.dart'; // ✅ Import LoginPage
+import 'edit_profile.dart';
+import 'main.dart'; // ✅ Import LoginPage for signOutCompletely
 
 class StylishProfilePage extends StatefulWidget {
   const StylishProfilePage({super.key});
@@ -12,7 +12,7 @@ class StylishProfilePage extends StatefulWidget {
 class _StylishProfilePageState extends State<StylishProfilePage> {
   String _name = 'Deepak Singh';
   String _email = 'deepaksingh91065@gmail.com';
-  int _rewards = 469; // Example reward count
+  int _rewards = 469;
 
   @override
   Widget build(BuildContext context) {
@@ -97,7 +97,6 @@ class _StylishProfilePageState extends State<StylishProfilePage> {
 
               const SizedBox(height: 12),
 
-              // Rewards Card
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: Container(
@@ -151,10 +150,7 @@ class _StylishProfilePageState extends State<StylishProfilePage> {
                 title: 'Log out',
                 isDanger: true,
                 onTap: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => LoginPage()),
-                  );
+                  LoginPage.signOutCompletely(context); // ✅ Updated logout action
                 },
               ),
 
@@ -166,7 +162,6 @@ class _StylishProfilePageState extends State<StylishProfilePage> {
     );
   }
 
-  // Tile Builder
   Widget buildInteractiveTile(
       BuildContext context, {
         required String title,

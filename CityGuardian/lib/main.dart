@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-
 import 'home_page.dart';
+
+// ✅ Shared GoogleSignIn instance
+final GoogleSignIn googleSignIn = GoogleSignIn();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,6 +29,33 @@ class CityGuardianApp extends StatelessWidget {
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
+  // ✅ Safe global logout method
+  static Future<void> signOutCompletely(BuildContext context) async {
+    try {
+      await FirebaseAuth.instance.signOut();
+      await googleSignIn.signOut();
+
+      try {
+        await googleSignIn.disconnect();
+      } catch (e) {
+        debugPrint("Google disconnect failed: $e");
+      }
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+            (route) => false,
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Sign-out failed: $e"),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
@@ -40,7 +69,7 @@ class _LoginPageState extends State<LoginPage> {
     try {
       setState(() => _isLoading = true);
 
-      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
       if (googleUser == null) return;
 
       final googleAuth = await googleUser.authentication;
@@ -118,7 +147,6 @@ class _LoginPageState extends State<LoginPage> {
                       style: TextStyle(fontSize: 14, color: Colors.black87)),
                   const SizedBox(height: 40),
 
-                  // Email input
                   TextField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
@@ -129,7 +157,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Password input
                   TextField(
                     controller: _passwordController,
                     obscureText: true,
@@ -140,7 +167,6 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Login with Email
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
@@ -158,7 +184,6 @@ class _LoginPageState extends State<LoginPage> {
                   const Text("or", style: TextStyle(fontSize: 14, color: Colors.black54)),
                   const SizedBox(height: 10),
 
-                  // Continue with Google
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
@@ -174,7 +199,6 @@ class _LoginPageState extends State<LoginPage> {
 
                   const SizedBox(height: 20),
 
-                  // Skip login button
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
