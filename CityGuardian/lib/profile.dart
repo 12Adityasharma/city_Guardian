@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'edit_profile.dart';
-import 'main.dart'; // ✅ Import LoginPage for signOutCompletely
+import 'main.dart'; // ✅ For signOutCompletely
 
 class StylishProfilePage extends StatefulWidget {
   const StylishProfilePage({super.key});
@@ -10,9 +11,23 @@ class StylishProfilePage extends StatefulWidget {
 }
 
 class _StylishProfilePageState extends State<StylishProfilePage> {
-  String _name = 'Deepak Singh';
-  String _email = 'deepaksingh91065@gmail.com';
+  String _name = 'Loading...';
+  String _email = 'Loading...';
   int _rewards = 469;
+  User? _currentUser;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentUser = FirebaseAuth.instance.currentUser;
+
+    if (_currentUser != null) {
+      setState(() {
+        _name = _currentUser!.displayName ?? 'No Name';
+        _email = _currentUser!.email ?? 'No Email';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +56,9 @@ class _StylishProfilePageState extends State<StylishProfilePage> {
                       children: [
                         CircleAvatar(
                           radius: 42,
-                          backgroundImage: const AssetImage('assets/deepak.jpeg'),
+                          backgroundImage: _currentUser?.photoURL != null
+                              ? NetworkImage(_currentUser!.photoURL!)
+                              : const AssetImage('assets/deepak.jpeg') as ImageProvider,
                         ),
                         const SizedBox(height: 10),
                         Text(
