@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart';
+import 'package:geolocator/geolocator.dart';
+
+import 'report_details_page.dart'; // Ensure this exists and is correctly implemented
 
 class CameraPage extends StatefulWidget {
   const CameraPage({super.key});
@@ -14,11 +17,10 @@ class CameraPage extends StatefulWidget {
 class _CameraPageState extends State<CameraPage> {
   CameraController? _cameraController;
   Future<void>? _initializeControllerFuture;
-  XFile? _capturedImage;
-
   List<CameraDescription>? _cameras;
   CameraDescription? _currentCamera;
   bool _isFlashOn = false;
+  bool _isLoadingLocation = false;  // To track if location is being fetched
 
   @override
   void initState() {
@@ -42,7 +44,7 @@ class _CameraPageState extends State<CameraPage> {
       ResolutionPreset.high,
     );
     _initializeControllerFuture = _cameraController!.initialize();
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   void _switchCamera() {
@@ -64,6 +66,36 @@ class _CameraPageState extends State<CameraPage> {
     setState(() {});
   }
 
+  Future<Position> _getCurrentLocation() async {
+    setState(() {
+      _isLoadingLocation = true;  // Start loading location
+    });
+
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      await Geolocator.openLocationSettings();
+      throw Exception('Location services are disabled.');
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) {
+        throw Exception('Location permission denied');
+      }
+    }
+
+    final position = await Geolocator.getCurrentPosition(
+      desiredAccuracy: LocationAccuracy.high,
+    );
+
+    setState(() {
+      _isLoadingLocation = false;  // Stop loading location
+    });
+
+    return position;
+  }
+
   Future<void> _captureImage() async {
     try {
       if (_cameraController == null || !_cameraController!.value.isInitialized) return;
@@ -74,9 +106,20 @@ class _CameraPageState extends State<CameraPage> {
       final savedPath = join(directory.path, '${DateTime.now()}.jpg');
       final savedImage = await File(image.path).copy(savedPath);
 
-      setState(() {
-        _capturedImage = XFile(savedImage.path);
-      });
+      final position = await _getCurrentLocation();
+
+      if (!mounted) return;
+      Navigator.push(
+        this.context,  // Correct use of context
+        MaterialPageRoute(
+          builder: (BuildContext context) => ReportDetailsPage(
+            imagePath: savedImage.path,
+            latitude: position.latitude,
+            longitude: position.longitude,
+            timestamp: DateTime.now(),
+          ),
+        ),
+      );
     } catch (e) {
       print('Capture error: $e');
     }
@@ -97,7 +140,7 @@ class _CameraPageState extends State<CameraPage> {
             ? const Center(child: CircularProgressIndicator())
             : FutureBuilder(
           future: _initializeControllerFuture,
-          builder: (context, snapshot) {
+          builder: (BuildContext context, AsyncSnapshot<void> snapshot) {
             if (snapshot.connectionState == ConnectionState.done &&
                 _cameraController != null &&
                 _cameraController!.value.isInitialized) {
@@ -106,19 +149,13 @@ class _CameraPageState extends State<CameraPage> {
                   SizedBox.expand(
                     child: CameraPreview(_cameraController!),
                   ),
-
-                  // Dark overlay using withAlpha
-                  Container(color: Colors.black.withAlpha((0.2 * 255).round())),
-
-                  // Google Lens-style frame
+                  Container(color: Colors.black.withOpacity(0.2)),
                   Center(
                     child: CustomPaint(
                       size: Size.infinite,
                       painter: LensFramePainter(),
                     ),
                   ),
-
-                  // Capture Button
                   Positioned(
                     bottom: 30,
                     left: 0,
@@ -133,15 +170,16 @@ class _CameraPageState extends State<CameraPage> {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: Colors.white,
-                            border: Border.all(color: Colors.grey.shade800, width: 4),
+                            border: Border.all(
+                              color: Colors.grey.shade800,
+                              width: 4,
+                            ),
                           ),
                           child: const Icon(Icons.camera_alt, color: Colors.black),
                         ),
                       ),
                     ),
                   ),
-
-                  // Flash Toggle Button
                   Positioned(
                     top: 40,
                     left: 20,
@@ -154,8 +192,6 @@ class _CameraPageState extends State<CameraPage> {
                       onPressed: _toggleFlash,
                     ),
                   ),
-
-                  // Switch Camera Button
                   Positioned(
                     top: 40,
                     right: 20,
@@ -164,25 +200,11 @@ class _CameraPageState extends State<CameraPage> {
                       onPressed: _switchCamera,
                     ),
                   ),
-
-                  // Captured Image Preview
-                  if (_capturedImage != null)
-                    Positioned(
-                      top: 100,
-                      right: 20,
-                      child: GestureDetector(
-                        onTap: () {
-                          showDialog(
-                            context: context,
-                            builder: (_) => Dialog(
-                              child: Image.file(File(_capturedImage!.path)),
-                            ),
-                          );
-                        },
-                        child: CircleAvatar(
-                          radius: 30,
-                          backgroundImage: FileImage(File(_capturedImage!.path)),
-                        ),
+                  // Show loading indicator while fetching location
+                  if (_isLoadingLocation)
+                    Center(
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
                       ),
                     ),
                 ],
@@ -197,7 +219,6 @@ class _CameraPageState extends State<CameraPage> {
   }
 }
 
-/// Google Lens-style frame painter
 class LensFramePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
