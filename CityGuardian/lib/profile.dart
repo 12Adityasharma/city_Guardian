@@ -56,9 +56,13 @@ class _StylishProfilePageState extends State<StylishProfilePage> {
                       children: [
                         CircleAvatar(
                           radius: 42,
+                          backgroundColor: Colors.grey[400],
                           backgroundImage: _currentUser?.photoURL != null
                               ? NetworkImage(_currentUser!.photoURL!)
-                              : const AssetImage('assets/deepak.jpeg') as ImageProvider,
+                              : null,
+                          child: _currentUser?.photoURL == null
+                              ? const Icon(Icons.person, size: 42, color: Colors.white)
+                              : null,
                         ),
                         const SizedBox(height: 10),
                         Text(
@@ -99,14 +103,15 @@ class _StylishProfilePageState extends State<StylishProfilePage> {
                       builder: (context) => EditProfilePage(
                         initialName: _name,
                         initialEmail: _email,
+                        initialPhotoUrl: _currentUser?.photoURL,
                       ),
                     ),
                   );
 
                   if (updatedProfile != null) {
                     setState(() {
-                      _name = updatedProfile['name']!;
-                      _email = updatedProfile['email']!;
+                      _name = updatedProfile['name'] ?? _name;
+                      _email = updatedProfile['email'] ?? _email;
                     });
                   }
                 },
@@ -167,7 +172,7 @@ class _StylishProfilePageState extends State<StylishProfilePage> {
                 title: 'Log out',
                 isDanger: true,
                 onTap: () {
-                  LoginPage.signOutCompletely(context); // ✅ Updated logout action
+                  LoginPage.signOutCompletely(context);
                 },
               ),
 

@@ -6,11 +6,13 @@ import 'package:image_picker/image_picker.dart';
 class EditProfilePage extends StatefulWidget {
   final String initialName;
   final String initialEmail;
+  final String? initialPhotoUrl;
 
   const EditProfilePage({
     super.key,
     required this.initialName,
     required this.initialEmail,
+    this.initialPhotoUrl,
   });
 
   @override
@@ -151,7 +153,6 @@ class _EditProfilePageState extends State<EditProfilePage> with SingleTickerProv
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
               child: Column(
                 children: [
-                  // Custom "App Bar"
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -167,7 +168,7 @@ class _EditProfilePageState extends State<EditProfilePage> with SingleTickerProv
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(width: 48), // Placeholder to balance back button
+                      const SizedBox(width: 48),
                     ],
                   ),
                   const SizedBox(height: 30),
@@ -176,10 +177,15 @@ class _EditProfilePageState extends State<EditProfilePage> with SingleTickerProv
                       children: [
                         CircleAvatar(
                           radius: 55,
+                          backgroundColor: Colors.grey[400],
                           backgroundImage: _profileImage != null
                               ? FileImage(_profileImage!)
-                              : const AssetImage('assets/deepak.jpg') as ImageProvider,
-                          backgroundColor: Colors.grey[300],
+                              : (widget.initialPhotoUrl != null
+                              ? NetworkImage(widget.initialPhotoUrl!)
+                              : null),
+                          child: (_profileImage == null && widget.initialPhotoUrl == null)
+                              ? const Icon(Icons.person, size: 55, color: Colors.white)
+                              : null,
                         ),
                         Positioned(
                           bottom: 0,
