@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart'; // <-- Add this!
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ReportDetailsPage extends StatefulWidget {
   final String imagePath;
@@ -44,6 +46,7 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
+            // Image Preview
             ClipRRect(
               borderRadius: BorderRadius.circular(20),
               child: Image.file(
@@ -52,11 +55,11 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
                 width: double.infinity,
                 fit: BoxFit.cover,
               ),
-            )
-                .animate()
-                .fadeIn(duration: 600.ms)
-                .slide(begin: const Offset(0, -0.2)),
+            ).animate().fadeIn(duration: 600.ms).slide(begin: const Offset(0, -0.2)),
+
             const SizedBox(height: 20),
+
+            // Description TextField
             TextField(
               controller: _descController,
               maxLines: 3,
@@ -67,11 +70,11 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
                 fillColor: Colors.white,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
               ),
-            )
-                .animate()
-                .fadeIn(duration: 500.ms)
-                .slideX(begin: -0.3),
+            ).animate().fadeIn(duration: 500.ms).slideX(begin: -0.3),
+
             const SizedBox(height: 20),
+
+            // Severity Dropdown
             Row(
               children: [
                 const Text('Severity:', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
@@ -101,11 +104,11 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
                   ),
                 ),
               ],
-            )
-                .animate()
-                .fadeIn(duration: 500.ms)
-                .slideX(begin: 0.3),
+            ).animate().fadeIn(duration: 500.ms).slideX(begin: 0.3),
+
             const SizedBox(height: 20),
+
+            // Location Card
             Card(
               color: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -123,11 +126,11 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
                   ],
                 ),
               ),
-            )
-                .animate()
-                .fadeIn(duration: 500.ms)
-                .slideY(begin: 0.2),
+            ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.2),
+
             const SizedBox(height: 30),
+
+            // Submit Button
             AnimatedSwitcher(
               duration: 400.ms,
               child: _isSubmitting
@@ -154,28 +157,52 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
     );
   }
 
+  /// Submits the report to Firebase Storage & Firestore
   void _submitReport() async {
     setState(() => _isSubmitting = true);
 
-    final reportData = {
-      'imagePath': widget.imagePath,
-      'latitude': widget.latitude,
-      'longitude': widget.longitude,
-      'timestamp': widget.timestamp.toIso8601String(),
-      'description': _descController.text,
-      'severity': _severity,
-    };
+    try {
+      final file = File(widget.imagePath);
+      final fileName = 'reports/${DateTime.now().millisecondsSinceEpoch}.jpg';
 
-    await Future.delayed(const Duration(seconds: 2)); // Simulate network delay
+      // Upload image to Firebase Storage
+      final ref = FirebaseStorage.instance.ref().child(fileName);
+      await ref.putFile(file);
+      final imageUrl = await ref.getDownloadURL();
 
-    print('Submitting report: $reportData');
+      // Create report data
+      final reportData = {
+        'imageUrl': imageUrl,
+        'latitude': widget.latitude,
+        'longitude': widget.longitude,
+        'timestamp': widget.timestamp.toIso8601String(),
+        'description': _descController.text,
+        'severity': _severity,
+      };
 
-    if (!mounted) return;
+      // Save to Firestore
+      await FirebaseFirestore.instance.collection('reports').add(reportData);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Report submitted successfully!')),
-    );
+      if (!mounted) return;
 
-    Navigator.pop(context);
+      // Show success
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Report submitted successfully!')),
+      );
+
+      Navigator.pop(context);
+    } catch (e) {
+      print('Submission failed: $e');
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to submit report: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
   }
 }
