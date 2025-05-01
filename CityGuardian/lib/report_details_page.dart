@@ -159,7 +159,7 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
 
   /// Submits the report to Firebase Storage & Firestore
   void _submitReport() async {
-    setState(() => _isSubmitting = true);
+    setState(() => _isSubmitting = true); // Show loading
 
     try {
       final file = File(widget.imagePath);
@@ -185,23 +185,24 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
 
       if (!mounted) return;
 
-      // Show success
+      // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Report submitted successfully!')),
       );
 
-      Navigator.pop(context);
+      Navigator.pop(context); // Go back after successful submission
     } catch (e) {
       print('Submission failed: $e');
 
       if (!mounted) return;
 
+      // Show error message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to submit report: $e')),
       );
     } finally {
       if (mounted) {
-        setState(() => _isSubmitting = false);
+        setState(() => _isSubmitting = false); // Hide loading spinner
       }
     }
   }
