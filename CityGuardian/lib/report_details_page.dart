@@ -1,8 +1,8 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ReportDetailsPage extends StatefulWidget {
   final String imagePath;
@@ -157,53 +157,50 @@ class _ReportDetailsPageState extends State<ReportDetailsPage> {
     );
   }
 
-  /// Submits the report to Firebase Storage & Firestore
+  /// Submits the report to Cloudinary with metadata
   void _submitReport() async {
-    setState(() => _isSubmitting = true); // Show loading
+    setState(() => _isSubmitting = true);
 
     try {
       final file = File(widget.imagePath);
-      final fileName = 'reports/${DateTime.now().millisecondsSinceEpoch}.jpg';
 
-      // Upload image to Firebase Storage
-      final ref = FirebaseStorage.instance.ref().child(fileName);
-      await ref.putFile(file);
-      final imageUrl = await ref.getDownloadURL();
+      final cloudName = 'dabaasyze';
+      final uploadPreset = 'cityguardian_preset';
+      final url = Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/image/upload');
 
-      // Create report data
-      final reportData = {
-        'imageUrl': imageUrl,
-        'latitude': widget.latitude,
-        'longitude': widget.longitude,
-        'timestamp': widget.timestamp.toIso8601String(),
-        'description': _descController.text,
-        'severity': _severity,
-      };
+      final request = http.MultipartRequest('POST', url)
+        ..fields['upload_preset'] = uploadPreset
+        ..fields['context'] =
+            'description=${_descController.text}|lat=${widget.latitude}|lng=${widget.longitude}|severity=$_severity|timestamp=${widget.timestamp.toIso8601String()}'
+        ..files.add(await http.MultipartFile.fromPath('file', file.path));
 
-      // Save to Firestore
-      await FirebaseFirestore.instance.collection('reports').add(reportData);
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
 
-      if (!mounted) return;
+      if (response.statusCode == 200) {
+        final result = json.decode(responseBody);
+        final imageUrl = result['secure_url'];
 
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Report submitted successfully!')),
-      );
+        if (!mounted) return;
 
-      Navigator.pop(context); // Go back after successful submission
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Report submitted successfully!')),
+        );
+
+        Navigator.pop(context);
+      } else {
+        throw Exception('Upload failed: $responseBody');
+      }
     } catch (e) {
       print('Submission failed: $e');
 
       if (!mounted) return;
 
-      // Show error message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to submit report: $e')),
       );
     } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false); // Hide loading spinner
-      }
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 }

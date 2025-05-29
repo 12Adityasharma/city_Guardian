@@ -27,6 +27,8 @@ dependencies:
   google_sign_in: ^6.1.0
   http: ^1.1.0
   flutter_animate: ^4.5.2
+  cloudinary_url_gen: ^1.0.0
+  cloudinary_api: ^1.0.0
 
 dev_dependencies:
   flutter_test:
