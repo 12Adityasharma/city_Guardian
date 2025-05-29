@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-
 import 'home_page.dart';
+
+// ✅ Shared GoogleSignIn instance
+final GoogleSignIn googleSignIn = GoogleSignIn();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,20 +29,93 @@ class CityGuardianApp extends StatelessWidget {
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
+  // ✅ Safe global logout method
+  static Future<void> signOutCompletely(BuildContext context) async {
+    try {
+      await FirebaseAuth.instance.signOut();
+      await googleSignIn.signOut();
+
+      try {
+        await googleSignIn.disconnect();
+      } catch (e) {
+        debugPrint("Google disconnect failed: $e");
+      }
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginPage()),
+            (route) => false,
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Sign-out failed: $e"),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _otpController = TextEditingController();
+
   bool _isLoading = false;
+  bool _codeSent = false;
+  String _verificationId = '';
+
+  Future<void> _sendOTP() async {
+    setState(() => _isLoading = true);
+
+    await FirebaseAuth.instance.verifyPhoneNumber(
+      phoneNumber: _phoneController.text.trim(),
+      verificationCompleted: (PhoneAuthCredential credential) async {
+        await FirebaseAuth.instance.signInWithCredential(credential);
+        _navigateToHome();
+      },
+      verificationFailed: (FirebaseAuthException e) {
+        _showError("Verification failed: ${e.message}");
+      },
+      codeSent: (String verificationId, int? resendToken) {
+        setState(() {
+          _codeSent = true;
+          _verificationId = verificationId;
+        });
+      },
+      codeAutoRetrievalTimeout: (String verificationId) {
+        _verificationId = verificationId;
+      },
+    );
+
+    setState(() => _isLoading = false);
+  }
+
+  Future<void> _verifyOTP() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final credential = PhoneAuthProvider.credential(
+        verificationId: _verificationId,
+        smsCode: _otpController.text.trim(),
+      );
+      await FirebaseAuth.instance.signInWithCredential(credential);
+      _navigateToHome();
+    } catch (e) {
+      _showError("Invalid OTP: $e");
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
 
   Future<void> _signInWithGoogle() async {
     try {
       setState(() => _isLoading = true);
 
-      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
       if (googleUser == null) return;
 
       final googleAuth = await googleUser.authentication;
@@ -54,23 +129,6 @@ class _LoginPageState extends State<LoginPage> {
       _navigateToHome();
     } catch (e) {
       _showError("Google sign-in failed: $e");
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _signInWithEmail() async {
-    try {
-      setState(() => _isLoading = true);
-
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-
-      _navigateToHome();
-    } catch (e) {
-      _showError("Email sign-in failed: $e");
     } finally {
       setState(() => _isLoading = false);
     }
@@ -118,47 +176,44 @@ class _LoginPageState extends State<LoginPage> {
                       style: TextStyle(fontSize: 14, color: Colors.black87)),
                   const SizedBox(height: 40),
 
-                  // Email input
                   TextField(
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
+                    controller: _phoneController,
+                    keyboardType: TextInputType.phone,
                     decoration: const InputDecoration(
-                      labelText: 'Email',
+                      labelText: 'Mobile Number (e.g. +14155552671)',
                       border: OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 16),
 
-                  // Password input
-                  TextField(
-                    controller: _passwordController,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Password',
-                      border: OutlineInputBorder(),
+                  if (_codeSent)
+                    TextField(
+                      controller: _otpController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Enter OTP',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
 
-                  // Login with Email
+                  const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      icon: const Icon(Icons.lock),
-                      label: const Text("Login with Email"),
+                      icon: const Icon(Icons.phone),
+                      label: Text(_codeSent ? "Verify OTP" : "Send OTP"),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
+                        backgroundColor: Colors.green,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      onPressed: _signInWithEmail,
+                      onPressed: _codeSent ? _verifyOTP : _sendOTP,
                     ),
                   ),
 
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 20),
                   const Text("or", style: TextStyle(fontSize: 14, color: Colors.black54)),
                   const SizedBox(height: 10),
 
-                  // Continue with Google
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
@@ -169,23 +224,6 @@ class _LoginPageState extends State<LoginPage> {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                       onPressed: _signInWithGoogle,
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Skip login button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      child: const Text("Login to your Account"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black87,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        textStyle: const TextStyle(fontSize: 16),
-                        foregroundColor: Colors.white,
-                      ),
-                      onPressed: _navigateToHome,
                     ),
                   ),
                   const SizedBox(height: 30),

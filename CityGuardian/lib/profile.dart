@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import 'edit_profile.dart'; // Import EditProfilePage
-import 'main.dart'; // ✅ Import LoginPage
+import 'package:firebase_auth/firebase_auth.dart';
+import 'edit_profile.dart';
+import 'main.dart'; // ✅ For signOutCompletely
 
 class StylishProfilePage extends StatefulWidget {
   const StylishProfilePage({super.key});
@@ -10,9 +11,23 @@ class StylishProfilePage extends StatefulWidget {
 }
 
 class _StylishProfilePageState extends State<StylishProfilePage> {
-  String _name = 'Deepak Singh';
-  String _email = 'deepaksingh91065@gmail.com';
-  int _rewards = 469; // Example reward count
+  String _name = 'Loading...';
+  String _email = 'Loading...';
+  int _rewards = 469;
+  User? _currentUser;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentUser = FirebaseAuth.instance.currentUser;
+
+    if (_currentUser != null) {
+      setState(() {
+        _name = _currentUser!.displayName ?? 'No Name';
+        _email = _currentUser!.email ?? 'No Email';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +56,13 @@ class _StylishProfilePageState extends State<StylishProfilePage> {
                       children: [
                         CircleAvatar(
                           radius: 42,
-                          backgroundImage: const AssetImage('assets/deepak.jpeg'),
+                          backgroundColor: Colors.grey[400],
+                          backgroundImage: _currentUser?.photoURL != null
+                              ? NetworkImage(_currentUser!.photoURL!)
+                              : null,
+                          child: _currentUser?.photoURL == null
+                              ? const Icon(Icons.person, size: 42, color: Colors.white)
+                              : null,
                         ),
                         const SizedBox(height: 10),
                         Text(
@@ -82,14 +103,15 @@ class _StylishProfilePageState extends State<StylishProfilePage> {
                       builder: (context) => EditProfilePage(
                         initialName: _name,
                         initialEmail: _email,
+                        initialPhotoUrl: _currentUser?.photoURL,
                       ),
                     ),
                   );
 
                   if (updatedProfile != null) {
                     setState(() {
-                      _name = updatedProfile['name']!;
-                      _email = updatedProfile['email']!;
+                      _name = updatedProfile['name'] ?? _name;
+                      _email = updatedProfile['email'] ?? _email;
                     });
                   }
                 },
@@ -97,7 +119,6 @@ class _StylishProfilePageState extends State<StylishProfilePage> {
 
               const SizedBox(height: 12),
 
-              // Rewards Card
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: Container(
@@ -151,10 +172,7 @@ class _StylishProfilePageState extends State<StylishProfilePage> {
                 title: 'Log out',
                 isDanger: true,
                 onTap: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => LoginPage()),
-                  );
+                  LoginPage.signOutCompletely(context);
                 },
               ),
 
@@ -166,7 +184,6 @@ class _StylishProfilePageState extends State<StylishProfilePage> {
     );
   }
 
-  // Tile Builder
   Widget buildInteractiveTile(
       BuildContext context, {
         required String title,

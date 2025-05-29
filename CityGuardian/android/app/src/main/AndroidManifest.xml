@@ -6,7 +6,7 @@
 
 
     <application
-        android:label="my_app"
+        android:label="City Guardian"
 
         android:icon="@mipmap/ic_launcher">
         <activity

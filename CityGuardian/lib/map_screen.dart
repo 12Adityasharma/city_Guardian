@@ -1,9 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:http/http.dart' as http;
+import 'package:geocoding/geocoding.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 class MapScreen extends StatefulWidget {
@@ -12,9 +10,10 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  final MapController _mapController = MapController();
-  LatLng _currentPosition = LatLng(27.552990, 76.634573); // default location
+  GoogleMapController? _mapController;
+  LatLng _currentPosition = const LatLng(27.552990, 76.634573);
   TextEditingController _searchController = TextEditingController();
+  Stream<Position>? _positionStream;
 
   @override
   void initState() {
@@ -27,51 +26,58 @@ class _MapScreenState extends State<MapScreen> {
     if (!permission.isGranted) {
       await Permission.locationWhenInUse.request();
     }
-    _getCurrentLocation();
+    _initLocationTracking();
   }
 
-  Future<void> _getCurrentLocation() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
+  void _initLocationTracking() async {
+    bool isEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!isEnabled) {
       await Geolocator.openLocationSettings();
       return;
     }
 
-    Position position = await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
+    _positionStream = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10,
+      ),
     );
-    setState(() {
-      _currentPosition = LatLng(position.latitude, position.longitude);
-    });
 
-    _mapController.move(_currentPosition, 15);
+    _positionStream!.listen((Position position) {
+      setState(() {
+        _currentPosition = LatLng(position.latitude, position.longitude);
+      });
+
+      _mapController?.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            target: _currentPosition,
+            zoom: 17.0,
+          ),
+        ),
+      );
+    });
   }
 
   Future<void> _searchLocation(String query) async {
-    final url = Uri.parse(
-      'https://nominatim.openstreetmap.org/search?q=$query&format=json&limit=1',
-    );
-
     try {
-      final response = await http.get(url, headers: {
-        'User-Agent': 'FlutterMapApp/1.0 (your_email@example.com)' // required by Nominatim
-      });
+      List<Location> locations = await locationFromAddress(query);
+      if (locations.isNotEmpty) {
+        Location loc = locations.first;
+        LatLng searchedLatLng = LatLng(loc.latitude, loc.longitude);
 
-      final data = jsonDecode(response.body);
-      if (data.isNotEmpty) {
-        final lat = double.parse(data[0]['lat']);
-        final lon = double.parse(data[0]['lon']);
-        LatLng searchedLatLng = LatLng(lat, lon);
-
-        _mapController.move(searchedLatLng, 15);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Location not found')),
+        _mapController?.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(
+              target: searchedLatLng,
+              zoom: 17.0,
+            ),
+          ),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Search error')),
+        SnackBar(content: Text('Location not found')),
       );
     }
   }
@@ -81,33 +87,17 @@ class _MapScreenState extends State<MapScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: MapOptions(
-              initialCenter: _currentPosition,
-              initialZoom: 14,
-              interactionOptions: const InteractionOptions(
-                enableScrollWheel: true,
-                enableMultiFingerGestureRace: true,
-              ),
+          GoogleMap(
+            initialCameraPosition: CameraPosition(
+              target: _currentPosition,
+              zoom: 14.0,
             ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                subdomains: const ['a', 'b', 'c'],
-                userAgentPackageName: 'com.example.app',
-              ),
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: _currentPosition,
-                    width: 40,
-                    height: 40,
-                    child: const Icon(Icons.location_pin, color: Colors.red, size: 40),
-                  )
-                ],
-              ),
-            ],
+            onMapCreated: (GoogleMapController controller) {
+              _mapController = controller;
+            },
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            mapType: MapType.normal,
           ),
 
           // Search box
@@ -135,12 +125,22 @@ class _MapScreenState extends State<MapScreen> {
             ),
           ),
 
-          // Location button
+          // Custom square location button
           Positioned(
             bottom: 100,
             right: 10,
             child: GestureDetector(
-              onTap: _getCurrentLocation,
+              onTap: () async {
+                Position position = await Geolocator.getCurrentPosition(
+                  desiredAccuracy: LocationAccuracy.high,
+                );
+                LatLng newPos = LatLng(position.latitude, position.longitude);
+                _mapController?.animateCamera(
+                  CameraUpdate.newCameraPosition(
+                    CameraPosition(target: newPos, zoom: 17),
+                  ),
+                );
+              },
               child: Container(
                 width: 40,
                 height: 40,
